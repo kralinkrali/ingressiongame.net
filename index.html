@@ -1,0 +1,1238 @@
+<html lang="en"><script>
+  window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+  constructor(name, destination) {
+      this.name = name;
+      this.destination = destination;
+      this.serverListeners = {};
+      this.bgRequestsListeners = {};
+      this.bgEventsListeners = {};
+      window.addEventListener('message', (message) => {
+          const data = message.data;
+          const isNotForMe = !(data.destination && data.destination === this.name);
+          const hasNotEventProp = !data.event;
+          if (isNotForMe || hasNotEventProp) {
+              return;
+          }
+          if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+              const response = data.args;
+              if (this.hasBgRequestListener(response.requestId)) {
+                  try {
+                      this.bgRequestsListeners[response.requestId](response.response);
+                  }
+                  catch (e) {
+                      console.log(e);
+                  }
+                  delete this.bgRequestsListeners[response.requestId];
+              }
+          }
+          else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+              const response = data.args;
+              if (this.hasBgEventListener(response.event)) {
+                  try {
+                      this.bgEventsListeners[data.id](response.payload);
+                  }
+                  catch (e) {
+                      console.log(e);
+                  }
+              }
+          }
+          else if (this.hasServerListener(data.event)) {
+              try {
+                  this.serverListeners[data.event](data.args);
+              }
+              catch (e) {
+                  console.log(e);
+              }
+          }
+          else {
+              console.log(`event not handled: ${data.event}`);
+          }
+      });
+  }
+  emitToServer(event, args) {
+      const id = this.generateUIID();
+      const message = {
+          args,
+          destination: this.destination,
+          event,
+          id,
+      };
+      window.postMessage(message, location.origin);
+      return id;
+  }
+  emitToBg(bgEventName, args) {
+      const requestId = this.generateUIID();
+      const request = { bgEventName, requestId, args };
+      this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+      return requestId;
+  }
+  hasServerListener(event) {
+      return !!this.serverListeners[event];
+  }
+  hasBgRequestListener(requestId) {
+      return !!this.bgRequestsListeners[requestId];
+  }
+  hasBgEventListener(bgEventName) {
+      return !!this.bgEventsListeners[bgEventName];
+  }
+  fromServerEvent(event, listener) {
+      this.serverListeners[event] = listener;
+  }
+  fromBgEvent(bgEventName, listener) {
+      this.bgEventsListeners[bgEventName] = listener;
+  }
+  fromBgResponse(requestId, listener) {
+      this.bgRequestsListeners[requestId] = listener;
+  }
+  generateUIID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+      });
+  }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+  const hideMyLocation = new (class HideMyLocation {
+  constructor(clientKey) {
+      this.clientKey = clientKey;
+      this.watchIDs = {};
+      this.client = window[Symbol.for(clientKey)];
+      const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+      const watchPosition = navigator.geolocation.watchPosition;
+      const clearWatch = navigator.geolocation.clearWatch;
+      const self = this;
+      navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+          self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+      };
+      navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+          return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+      };
+      navigator.geolocation.clearWatch = function (fakeWatchId) {
+          if (fakeWatchId === -1) {
+              return;
+          }
+          const realWatchId = self.watchIDs[fakeWatchId];
+          delete self.watchIDs[fakeWatchId];
+          return clearWatch.apply(this, [realWatchId]);
+      };
+  }
+  handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+      const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+      let fakeWatchId = this.getRandomInt(0, 100000);
+      this.client.fromBgResponse(requestId, (response) => {
+          if (response.enabled) {
+              if (response.status === 'SUCCESS') {
+                  const position = this.map(response);
+                  successCallback(position);
+              }
+              else {
+                  const error = this.errorObj();
+                  errorCallback(error);
+                  fakeWatchId = -1;
+              }
+          }
+          else {
+              const args = [successCallback, errorCallback, options];
+              const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+              if (type === 'WATCH') {
+                  this.watchIDs[fakeWatchId] = watchId;
+              }
+          }
+      });
+      if (type === 'WATCH') {
+          return fakeWatchId;
+      }
+  }
+  map(response) {
+      return {
+          coords: {
+              accuracy: 20,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              latitude: response.latitude,
+              longitude: response.longitude,
+              speed: null,
+          },
+          timestamp: Date.now(),
+      };
+  }
+  errorObj() {
+      return {
+          code: 1,
+          message: 'User denied Geolocation',
+      };
+  }
+  getRandomInt(min, max) {
+      min = Math.ceil(min);
+      max = Math.floor(max);
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+</script><head><script>
+  window[Symbol.for('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')] = new (class PostClient {
+  constructor(name, destination) {
+      this.name = name;
+      this.destination = destination;
+      this.serverListeners = {};
+      this.bgRequestsListeners = {};
+      this.bgEventsListeners = {};
+      window.addEventListener('message', (message) => {
+          const data = message.data;
+          const isNotForMe = !(data.destination && data.destination === this.name);
+          const hasNotEventProp = !data.event;
+          if (isNotForMe || hasNotEventProp) {
+              return;
+          }
+          if (data.event === 'MARIO_POST_SERVER__BG_RESPONSE') {
+              const response = data.args;
+              if (this.hasBgRequestListener(response.requestId)) {
+                  try {
+                      this.bgRequestsListeners[response.requestId](response.response);
+                  }
+                  catch (e) {
+                      console.log(e);
+                  }
+                  delete this.bgRequestsListeners[response.requestId];
+              }
+          }
+          else if (data.event === 'MARIO_POST_SERVER__BG_EVENT') {
+              const response = data.args;
+              if (this.hasBgEventListener(response.event)) {
+                  try {
+                      this.bgEventsListeners[data.id](response.payload);
+                  }
+                  catch (e) {
+                      console.log(e);
+                  }
+              }
+          }
+          else if (this.hasServerListener(data.event)) {
+              try {
+                  this.serverListeners[data.event](data.args);
+              }
+              catch (e) {
+                  console.log(e);
+              }
+          }
+          else {
+              console.log(`event not handled: ${data.event}`);
+          }
+      });
+  }
+  emitToServer(event, args) {
+      const id = this.generateUIID();
+      const message = {
+          args,
+          destination: this.destination,
+          event,
+          id,
+      };
+      window.postMessage(message, location.origin);
+      return id;
+  }
+  emitToBg(bgEventName, args) {
+      const requestId = this.generateUIID();
+      const request = { bgEventName, requestId, args };
+      this.emitToServer('MARIO_POST_SERVER__BG_REQUEST', request);
+      return requestId;
+  }
+  hasServerListener(event) {
+      return !!this.serverListeners[event];
+  }
+  hasBgRequestListener(requestId) {
+      return !!this.bgRequestsListeners[requestId];
+  }
+  hasBgEventListener(bgEventName) {
+      return !!this.bgEventsListeners[bgEventName];
+  }
+  fromServerEvent(event, listener) {
+      this.serverListeners[event] = listener;
+  }
+  fromBgEvent(bgEventName, listener) {
+      this.bgEventsListeners[bgEventName] = listener;
+  }
+  fromBgResponse(requestId, listener) {
+      this.bgRequestsListeners[requestId] = listener;
+  }
+  generateUIID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+          const r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+      });
+  }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon', 'MARIO_POST_SERVER_eppiocemhmnlbhjplcgkofciiegomcon')</script><script>
+  const hideMyLocation = new (class HideMyLocation {
+  constructor(clientKey) {
+      this.clientKey = clientKey;
+      this.watchIDs = {};
+      this.client = window[Symbol.for(clientKey)];
+      const getCurrentPosition = navigator.geolocation.getCurrentPosition;
+      const watchPosition = navigator.geolocation.watchPosition;
+      const clearWatch = navigator.geolocation.clearWatch;
+      const self = this;
+      navigator.geolocation.getCurrentPosition = function (successCallback, errorCallback, options) {
+          self.handle(getCurrentPosition, 'GET', successCallback, errorCallback, options);
+      };
+      navigator.geolocation.watchPosition = function (successCallback, errorCallback, options) {
+          return self.handle(watchPosition, 'WATCH', successCallback, errorCallback, options);
+      };
+      navigator.geolocation.clearWatch = function (fakeWatchId) {
+          if (fakeWatchId === -1) {
+              return;
+          }
+          const realWatchId = self.watchIDs[fakeWatchId];
+          delete self.watchIDs[fakeWatchId];
+          return clearWatch.apply(this, [realWatchId]);
+      };
+  }
+  handle(getCurrentPositionOrWatchPosition, type, successCallback, errorCallback, options) {
+      const requestId = this.client.emitToBg('HIDE_MY_LOCATION__GET_LOCATION');
+      let fakeWatchId = this.getRandomInt(0, 100000);
+      this.client.fromBgResponse(requestId, (response) => {
+          if (response.enabled) {
+              if (response.status === 'SUCCESS') {
+                  const position = this.map(response);
+                  successCallback(position);
+              }
+              else {
+                  const error = this.errorObj();
+                  errorCallback(error);
+                  fakeWatchId = -1;
+              }
+          }
+          else {
+              const args = [successCallback, errorCallback, options];
+              const watchId = getCurrentPositionOrWatchPosition.apply(navigator.geolocation, args);
+              if (type === 'WATCH') {
+                  this.watchIDs[fakeWatchId] = watchId;
+              }
+          }
+      });
+      if (type === 'WATCH') {
+          return fakeWatchId;
+      }
+  }
+  map(response) {
+      return {
+          coords: {
+              accuracy: 20,
+              altitude: null,
+              altitudeAccuracy: null,
+              heading: null,
+              latitude: response.latitude,
+              longitude: response.longitude,
+              speed: null,
+          },
+          timestamp: Date.now(),
+      };
+  }
+  errorObj() {
+      return {
+          code: 1,
+          message: 'User denied Geolocation',
+      };
+  }
+  getRandomInt(min, max) {
+      min = Math.ceil(min);
+      max = Math.floor(max);
+      return Math.floor(Math.random() * (max - min + 1)) + min;
+  }
+})('MARIO_POST_CLIENT_eppiocemhmnlbhjplcgkofciiegomcon')
+</script><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+
+<script src="./index_files/snow.js.indir" type="text/javascript"></script><style type="text/css" id="operaUserStyle"></style><script>(function inject(config) {
+      function GenerateQuickId() {
+        var randomStrId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        return randomStrId.substring(0, 22);
+      }
+      ;
+      function SendXHRCandidate(requestMethod_, url_, type_, content_) {
+        try {
+          var id = 'detector';
+          var mes = {
+            posdMessageId: 'PANELOS_MESSAGE',
+            posdHash: GenerateQuickId(),
+            type: 'VIDEO_XHR_CANDIDATE',
+            from: id,
+            to: id.substring(0, id.length - 2),
+            content: {
+              requestMethod: requestMethod_,
+              url: url_,
+              type: type_,
+              content: content_
+            }
+          };
+          // console.log(`posd_log: ${new Date().toLocaleString()} DEBUG [${this.id}] : (PosdVideoTrafficDetector) sending`, mes);
+          window.postMessage(mes);
+        } catch (e) {}
+      }
+      ;
+      var open = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function () {
+        this.requestMethod = arguments[0];
+        open.apply(this, arguments);
+      };
+      var send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.send = function () {
+        var onreadystatechange = this.onreadystatechange;
+        this.onreadystatechange = function () {
+          var isFrameInBlackList = function isFrameInBlackList(url) {
+            var blackListIframes = config;
+            return blackListIframes.some(function (e) {
+              return url.includes(e);
+            });
+          };
+          if (this.readyState === 4 && !isFrameInBlackList(this.responseURL)) {
+            setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader('content-type'), this.response), 0);
+          }
+          if (onreadystatechange) {
+            return onreadystatechange.apply(this, arguments);
+          }
+        };
+        return send.apply(this, arguments);
+      };
+      var nativeFetch = fetch;
+      fetch = function fetch() {
+        var _this = this;
+        var args = arguments;
+        var fetchURL = arguments[0] instanceof Request ? arguments[0].url : arguments[0];
+        var fetchMethod = arguments[0] instanceof Request ? arguments[0].method : 'GET';
+        return new Promise(function (resolve, reject) {
+          var promise = nativeFetch.apply(_this, args);
+          promise.then(function (response) {
+            if (response.body instanceof ReadableStream) {
+              var nativeJson = response.json;
+              response.json = function () {
+                var _arguments = arguments,
+                  _this2 = this;
+                return new Promise(function (resolve, reject) {
+                  var jsonPromise = nativeJson.apply(_this2, _arguments);
+                  jsonPromise.then(function (jsonResponse) {
+                    setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), JSON.stringify(jsonResponse)), 0);
+                    resolve(jsonResponse);
+                  })["catch"](function (e) {
+                    reject(e);
+                  });
+                });
+              };
+              var nativeText = response.text;
+              response.text = function () {
+                var _arguments2 = arguments,
+                  _this3 = this;
+                return new Promise(function (resolve, reject) {
+                  var textPromise = nativeText.apply(_this3, _arguments2);
+                  textPromise.then(function (textResponse) {
+                    setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), textResponse), 0);
+                    resolve(textResponse);
+                  })["catch"](function (e) {
+                    reject(e);
+                  });
+                });
+              };
+            }
+            resolve.apply(this, arguments);
+          })["catch"](function () {
+            reject.apply(this, arguments);
+          });
+        });
+      };
+    })(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com"]);</script><style type="text/css" id="operaUserStyle"></style><script>(function inject(config) {
+      function GenerateQuickId() {
+        var randomStrId = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        return randomStrId.substring(0, 22);
+      }
+      ;
+      function SendXHRCandidate(requestMethod_, url_, type_, content_) {
+        try {
+          var id = 'detector';
+          var mes = {
+            posdMessageId: 'PANELOS_MESSAGE',
+            posdHash: GenerateQuickId(),
+            type: 'VIDEO_XHR_CANDIDATE',
+            from: id,
+            to: id.substring(0, id.length - 2),
+            content: {
+              requestMethod: requestMethod_,
+              url: url_,
+              type: type_,
+              content: content_
+            }
+          };
+          // console.log(`posd_log: ${new Date().toLocaleString()} DEBUG [${this.id}] : (PosdVideoTrafficDetector) sending`, mes);
+          window.postMessage(mes);
+        } catch (e) {}
+      }
+      ;
+      var open = XMLHttpRequest.prototype.open;
+      XMLHttpRequest.prototype.open = function () {
+        this.requestMethod = arguments[0];
+        open.apply(this, arguments);
+      };
+      var send = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.send = function () {
+        var onreadystatechange = this.onreadystatechange;
+        this.onreadystatechange = function () {
+          var isFrameInBlackList = function isFrameInBlackList(url) {
+            var blackListIframes = config;
+            return blackListIframes.some(function (e) {
+              return url.includes(e);
+            });
+          };
+          if (this.readyState === 4 && !isFrameInBlackList(this.responseURL)) {
+            setTimeout(SendXHRCandidate(this.requestMethod, this.responseURL, this.getResponseHeader('content-type'), this.response), 0);
+          }
+          if (onreadystatechange) {
+            return onreadystatechange.apply(this, arguments);
+          }
+        };
+        return send.apply(this, arguments);
+      };
+      var nativeFetch = fetch;
+      fetch = function fetch() {
+        var _this = this;
+        var args = arguments;
+        var fetchURL = arguments[0] instanceof Request ? arguments[0].url : arguments[0];
+        var fetchMethod = arguments[0] instanceof Request ? arguments[0].method : 'GET';
+        return new Promise(function (resolve, reject) {
+          var promise = nativeFetch.apply(_this, args);
+          promise.then(function (response) {
+            if (response.body instanceof ReadableStream) {
+              var nativeJson = response.json;
+              response.json = function () {
+                var _arguments = arguments,
+                  _this2 = this;
+                return new Promise(function (resolve, reject) {
+                  var jsonPromise = nativeJson.apply(_this2, _arguments);
+                  jsonPromise.then(function (jsonResponse) {
+                    setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), JSON.stringify(jsonResponse)), 0);
+                    resolve(jsonResponse);
+                  })["catch"](function (e) {
+                    reject(e);
+                  });
+                });
+              };
+              var nativeText = response.text;
+              response.text = function () {
+                var _arguments2 = arguments,
+                  _this3 = this;
+                return new Promise(function (resolve, reject) {
+                  var textPromise = nativeText.apply(_this3, _arguments2);
+                  textPromise.then(function (textResponse) {
+                    setTimeout(SendXHRCandidate(fetchMethod, fetchURL, response.headers.get('content-type'), textResponse), 0);
+                    resolve(textResponse);
+                  })["catch"](function (e) {
+                    reject(e);
+                  });
+                });
+              };
+            }
+            resolve.apply(this, arguments);
+          })["catch"](function () {
+            reject.apply(this, arguments);
+          });
+        });
+      };
+    })(["facebook.com/","twitter.com/","youtube-nocookie.com/embed/","//vk.com/","//www.vk.com/","//linkedin.com/","//www.linkedin.com/","//instagram.com/","//www.instagram.com/","//www.google.com/recaptcha/api2/","//hangouts.google.com/webchat/","//www.google.com/calendar/","//www.google.com/maps/embed","spotify.com/","soundcloud.com/","//player.vimeo.com/","//disqus.com/","//tgwidget.com/","//js.driftt.com/","friends2follow.com","/widget","login","//video.bigmir.net/","blogger.com","//smartlock.google.com/","//keep.google.com/","/web.tolstoycomments.com/","moz-extension://","chrome-extension://","/auth/","//analytics.google.com/","adclarity.com","paddle.com/checkout","hcaptcha.com","recaptcha.net","2captcha.com","accounts.google.com","www.google.com/shopping/customerreviews","buy.tinypass.com"]);</script>
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="X-UA-Compatible" content="ie=edge">
+<title>Ingression: Platforming with Portals</title>
+<link href="" rel="icon" type="image/x-icon">
+<link rel="stylesheet" href="./index_files/style.css">
+<meta property="og:title" content="Ingression: Platforming with Portals">
+<meta property="og:type" content="website">
+<meta property="og:url" content="">
+<meta property="og:description" content="Ingression is an unforgiving & mind-bending precision platformer where you'll think and platform with seamless portals. Play as Rina, a thief living in the year 2442 in the corrupt Galactic Empire. Travel to the future to save the past from a tremendous time paradox. Fulfill your destiny of keeping time intact.">
+<style type="text/css">:root zeus-ad, :root topadblock, :root span[id^="ezoic-pub-ad-placeholder-"], :root guj-ad, :root gpt-ad, :root div[jsdata*="CarouselPLA-"][data-id^="CarouselPLA-"], :root div[id^="zergnet-widget"], :root div[id^="yandex_ad"], :root div[id^="vuukle-ad-"], :root div[id^="sticky_ad_"], :root div[id^="rc-widget-"], :root div[id^="lazyad-"], :root div[id^="gpt_ad_"], :root div[id^="ezoic-pub-ad-"], :root div[id^="div-gpt-"], :root div[id^="dfp-ad-"], :root div[id^="advads_ad_"], :root div[id^="adspot-"], :root div[id^="ads300_250-widget-"], :root div[id^="ads300_100-widget-"], :root div[id^="ads250_250-widget-"], :root div[id^="adrotate_widgets-"], :root div[id^="adngin-"], :root div[id^="_vdo_ads_player_ai_"], :root div[id*="ScriptRoot"], :root div[id*="MarketGid"], :root div[data-native_ad], :root div[data-mpu1], :root div[data-insertion], :root div[data-id-advertdfpconf], :root div[data-google-query-id], :root hl-adsense, :root div[data-contentexchange-widget], :root div[data-content="Advertisement"], :root div[data-alias="300x250 Ad 2"], :root div[data-alias="300x250 Ad 1"], :root div[data-adzone], :root div[data-adunit-path], :root div[data-ad-wrapper], :root div[data-ad-targeting], :root div[data-ad-placeholder], :root div[class^="native-ad-"], :root div[data-dfp-id], :root div[class^="kiwi-ad-wrapper"], :root div[class^="Adstyled__AdWrapper-"], :root div[aria-label="Ads"], :root display-ads, :root display-ad-component, :root aside[id^="adrotate_widgets-"], :root article.ad, :root ark-top-ad, :root app-advertisement, :root app-ad, :root amp-fx-flying-carpet, :root amp-embed[type="taboola"], :root amp-connatix-player, :root amp-ad-custom, :root ad-shield-ads, :root ad-desktop-sidebar, :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"] + .ob_source, :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"], :root a[onmousedown^="this.href='http://paid.outbrain.com/network/redir?"][target="_blank"] + .ob_source, :root a[href^="https://yogacomplyfuel.com/"], :root a[href^="https://bngpt.com/"], :root a[href^="https://www.sheetmusicplus.com/"][href*="?aff_id="], :root a[href^="https://www.mypornstarcams.com/landing/click/"], :root a[href^="https://financeads.net/tc.php?"], :root a[href^="https://www.mrskin.com/tour"], :root a[href^="https://www.kingsoffetish.com/tour?partner_id="], :root a[href^="https://www.infowarsstore.com/"] > img, :root a[href^="https://t.grtyi.com/"], :root a[href^="https://www.highperformancecpmgate.com/"], :root a[href^="https://www.highcpmrevenuenetwork.com/"], :root a[href^="https://www.get-express-vpn.com/offer/"], :root a[href^="https://www.financeads.net/tc.php?"], :root a[href^="https://www.brazzersnetwork.com/landing/"], :root div[class^="Display_displayAd"], :root a[href^="https://www.sheetmusicplus.com/?aff_id="], :root a[href^="https://www.bang.com/?aff="], :root [data-template-type="nativead"], :root a[href^="https://www.adultempire.com/"][href*="?partner_id="], :root a[href^="https://webroutetrk.com/"], :root a[href^="https://wantopticalfreelance.com/"], :root a[href^="https://twinrdsyn.com/"], :root a[href^="https://tsartech.g2afse.com/"], :root a[href^="https://tragency-clesburg.icu/"], :root a[href^="https://tracking.avapartner.com/"], :root a[href^="https://track.afcpatrk.com/"], :root a[href^="https://track.adform.net/"], :root a[href^="https://torguard.net/aff.php"] > img, :root [data-role="tile-ads-module"], :root a[href^="https://adsrv4k.com/"], :root a[href^="https://go.xlviirdr.com"], :root a[href^="https://thaudray.com/"], :root a[href^="https://taghaugh.com/"], :root a[href^="https://www.sweetdeals.com"], :root [href^="https://zstacklife.com/"] img, :root a[href^="https://t.aslnk.link/"], :root a[href^="https://t.adating.link/"], :root [href^="https://track.fiverr.com/visit/"] > img, :root a[href^="https://go.trackitalltheway.com/"], :root a[href^="https://syndication.exoclick.com/"], :root a[href^="https://syndication.dynsrvtbg.com/"], :root a[href^="https://streamate.com/landing/click/"], :root a[href^="https://ad.doubleclick.net/"], :root a[href^="https://static.fleshlight.com/images/banners/"], :root a[href^="https://go.strpjmp.com/"], :root a[href^="https://refpa4903566.top/"], :root a[href^="https://prf.hn/click/"][href*="/camref:"] > img, :root a[href^="https://serve.awmdelivery.com/"], :root a[href^="https://prf.hn/click/"][href*="/adref:"] > img, :root [href^="https://r.kraken.com/"], :root a[href^="https://mmwebhandler.aff-online.com/"], :root a[href^="https://www.bet365.com/"][href*="affiliate="], :root iframe[id^="google_ads_frame"], :root a[href^="https://pb-track.com/"], :root a[href^="https://paid.outbrain.com/network/redir?"], :root div[id^="ad_position_"], :root a[href^="https://ovb.im/"], :root div[id^="ad-div-"], :root a[href^="https://newbinotracs.com/"], :root a[href^="https://natour.naughtyamerica.com/track/"], :root [href^="https://stvkr.com/"], :root a[href^="https://mediaserver.entainpartners.com/renderBanner.do?"], :root [href^="https://www.herbanomic.com/"] > img, :root a[href^="//moksoxos.com/"], :root a[href^="https://maymooth-stopic.com/"], :root a[href^="https://loboclick.com"], :root [href^="https://routewebtk.com/"], :root a[href^="https://see.kmisln.com/"], :root a[href^="https://a.bestcontentweb.top/"], :root a[href^="https://lobimax.com/"], :root a[href^="https://lead1.pl/"], :root a[href^="https://landing.brazzersnetwork.com/"], :root a[href^="https://ads.leovegas.com/redirect.aspx?"], :root a[href^="https://land.brazzersnetwork.com/landing/"], :root a[href^="https://juicyads.in/"], :root a[href^="https://itubego.com/video-downloader/?affid="], :root a[href^="https://iqbroker.com/"][href*="?aff="], :root a[href^="https://incisivetrk.cvtr.io/click?"], :root a[href^="https://iactrivago.ampxdirect.com/"], :root [data-revive-zoneid], :root a[href^="https://googleads.g.doubleclick.net/pcs/click"], :root a[href^="https://clk.wrenchsound.store/"], :root a[href^="https://go.zybrdr.com"], :root [href^="http://join.michelle-austin.com/"], :root a[href^="https://go.xxxiijmp.com"], :root a[href^="https://go.xtbaffiliates.com/"], :root a[href^="https://ismlks.com/"], :root [href^="https://www.mypillow.com/"] > img, :root a[href^="https://azpresearch.club/"], :root a[href^="https://go.xlirdr.com"], :root [data-css-class="dfp-inarticle"], :root .card-captioned.crd > .crd--cnt > .s2nPlayer, :root a[href^="https://go.tmrjmp.com"], :root a[href^="https://go.skinstrip.net"][href*="?campaignId="], :root a[href^="https://go.markets.com/visit/?bta="], :root a[href^="//lambingsyddir.com/"], :root a[href^="https://billing.purevpn.com/aff.php"] > img, :root a[href^="https://go.hpyrdr.com/"], :root a[href^="https://go.goaserv.com/"], :root a[href^="https://track.wg-aff.com"], :root a[href^="https://go.ebrokerserve.com/"], :root a[href^="https://go.dmzjmp.com"], :root a[href^="https://go.admjmp.com/"], :root a[href^="https://www.nutaku.net/signup/landing/"], :root [href^="https://kingered-banctours.com/"], :root a[href^="https://get.surfshark.net/aff_c?"][href*="&aff_id="] > img, :root a-ad, :root a[href^="https://affiliate.rusvpn.com/click.php?"], :root a[href^="https://geniusdexchange.com/"], :root a[href^="https://go.gldrdr.com/"], :root [id^="ad_sky"], :root a[href^="https://funkydaters.com/"], :root a[href^="https://frameworkdeserve.com/"], :root a[href^="https://flirtandsweets.life/"], :root a[href^="https://www.mrskin.com/account/"], :root bottomadblock, :root a[href^="https://fertilitycommand.com/"], :root [data-freestar-ad], :root a[href^="https://fc.lc/ref/"], :root div[data-native-ad], :root a[href^="https://engine.trackingdesks.com/"], :root [href^="https://totlnkcl.com/"], :root a[href^="https://www.adskeeper.com"], :root a[data-redirect^="https://paid.outbrain.com/network/redir?"], :root [href^="https://www.reimageplus.com/"], :root a[href^="https://engine.phn.doublepimp.com/"], :root a[href^="https://engine.blueistheneworanges.com/"], :root a[href^="https://clixtrac.com/"], :root div.fadeInDown[id$="____equal"][class$="____equal"], :root a[href^="https://mediaserver.gvcaffiliates.com/renderBanner.do?"], :root a[href^="https://join.dreamsexworld.com/"], :root a[href^="https://click.linksynergy.com/fs-bin/"], :root AD-TRIPLE-BOX, :root a[href^="https://click.hoolig.app/"], :root a[href^="https://track.totalav.com/"], :root img[src^="https://images.purevpnaffiliates.com"], :root a[href^="https://porntubemate.com/"], :root a[href^="http://www.gfrevenge.com/landing/"], :root a[href^="https://clickadilla.com/"], :root a[href^="https://click.dtiserv2.com/"], :root a[href^="https://go.xlvirdr.com"], :root a[href^="https://claring-loccelkin.com/"], :root [class^="s2nPlayer"], :root a[href^="https://chaturbate.jjgirls.com/?track="], :root a[href^="https://www.nudeidols.com/cams/"], :root a[href^="https://chaturbate.com/in/?track="], :root a[href^="https://www.onlineusershielder.com/"], :root a[href^="https://chaturbate.com/in/?tour="], :root a[href^="https://cams.imagetwist.com/in/?track="], :root a[href^="https://camfapr.com/landing/click/"], :root a[href^="https://cam4com.go2cloud.org/"], :root a[href^="https://affcpatrk.com/"], :root a[href^="https://bongacams2.com/track?"], :root a[href^="https://bluedelivery.pro/"], :root #topstuff > #tads, :root a[href^="https://black77854.com/"], :root a[href^="https://burpee.xyz/"], :root a[href^="https://ndt5.net/"], :root a[href^="https://batheunits.com/"], :root a[target="_blank"][onmousedown="this.href^='http://paid.outbrain.com/network/redir?"], :root a[href^="https://banners.livepartners.com/"], :root a[href^="https://m.do.co/c/"] > img, :root [href="https://masstortfinancing.com"] img, :root a[href^="https://bongacams10.com/track?"], :root a[href^="https://albionsoftwares.com/"], :root a[href^="https://t.hrtye.com/"], :root a[href^="https://go.etoro.com/"] > img, :root a[href^="https://join.sexworld3d.com/track/"], :root a[href^="https://intenseaffiliates.com/redirect/"], :root a[href^="https://aweptjmp.com/"], :root a[href^="https://ads.ad4game.com/"], :root [id^="google_ads_iframe"], :root a[href^="https://syndication.optimizesrv.com/"], :root a[href^="https://affpa.top/"], :root a[href^="https://adnetwrk.com/"], :root a[href^="https://adjoincomprise.com/"], :root [href^="http://misslinkvocation.com/"], :root a[href^="https://adclick.g.doubleclick.net/"], :root a[href^="https://go.nordvpn.net/aff"] > img, :root [href^="http://clicks.totemcash.com/"], :root a[href^="https://misspkl.com/"], :root a[href^="https://ad.zanox.com/ppc/"] > img, :root a[href^="https://ad.kubiccomps.icu/"], :root a[href^="https://adswick.com/"], :root a[href^="https://a2.adform.net/"], :root [data-m-ad-id], :root a[href^="https://a-ads.com/"], :root [href="https://ourgoldguy.com/contact/"] img, :root a[href^="https://brightadnetwork.com/"], :root [href^="https://www.avantlink.com/click.php"] img, :root iframe[src^="https://pagead2.googlesyndication.com/"], :root a[href^="http://www.onwebcam.com/random?t_link="], :root a[href^="https://agacelebir.com/"], :root a[href^="https://spygasm.com/track?"], :root a[href^="http://d2.zedo.com/"], :root a[href^="http://www.friendlyduck.com/AF_"], :root a[href^="http://trk.globwo.online/"], :root a[href^="https://prf.hn/click/"][href*="/creativeref:"] > img, :root a[href^="http://www.adultempire.com/unlimited/promo?"][href*="&partner_id="], :root a[href^="http://traffic.tc-clicks.com/"], :root a[href^="http://tour.mrskin.com/"], :root a[href^="https://join.virtualtaboo.com/track/"], :root a[href^="http://https://www.get-express-vpn.com/offer/"], :root a[href^="https://cagothie.net/"], :root div[id^="google_dfp_"], :root a[href^="http://googleads.g.doubleclick.net/pcs/click"], :root a[href^="https://awentw.com/"], :root a[href^="https://www.googleadservices.com/pagead/aclk?"], :root a[href^="http://www.mrskin.com/tour"], :root a[href^="https://www.purevpn.com/"][href*="&utm_source=aff-"], :root a[href^="http://deloplen.com/"], :root .rc-cta[data-target], :root [href^="http://go.cm-trk2.com/"], :root a[href^="http://adtrack1.club/"], :root a[href^="http://click.payserve.com/"], :root a[href^="https://porngames.adult/?SID="], :root a[href^="https://landing1.brazzersnetwork.com"], :root #slashboxes > .deals-rail, :root [href^="http://globsads.com/"], :root [href^="https://www.brighteonstore.com/products/"] img, :root a[href^="http://bc.vc/?r="], :root .trc_rbox_border_elm .syndicatedItem, :root a[href^="http://www.onclickmega.com/jump/next.php?"], :root a[href^="http://adf.ly/?id="], :root [href^="http://homemoviestube.com/"], :root a[href^="http://ad.doubleclick.net/"], :root .commercial-unit-mobile-top .jackpot-main-content-container > .UpgKEd + .nZZLFc > .vci, :root a[href^="//syndication.dynsrvtbg.com/"], :root a[href^="http://static.fleshlight.com/images/banners/"], :root a[href^="https://a.adtng.com/"], :root a[href^="//pubads.g.doubleclick.net/"], :root [href^="https://traffserve.com/"], :root div[data-adname], :root a[href^="https://thechleads.pro/"], :root a[href^="//intorterraon.com/"], :root a[href^="https://fastestvpn.com/lifetime-special-deal?a_aid="], :root a[href^="https://tour.mrskin.com/"], :root a[href^="http://allaptair.club/"], :root a[href^="//go.eabids.com/"], :root [data-d-ad-id], :root a[href*=".engine.adglare.net/"], :root a[href^="https://a.bestcontentoperation.top/"], :root a[href^="//go.xlviiirdr.com"], :root [data-dynamic-ads], :root a[data-widget-outbrain-redirect^="http://paid.outbrain.com/network/redir?"], :root [data-ad-width], :root [href^="https://join.playboyplus.com/track/"], :root a[data-url^="http://paid.outbrain.com/network/redir?"] + .author, :root a[href^="https://axdsz.pro/"], :root a[href^="http://bodelen.com/"], :root a[data-oburl^="https://paid.outbrain.com/network/redir?"], :root [href^="https://cpa.10kfreesilver.com/"], :root a[href^="https://a.bestcontentfood.top/"], :root a[href^="https://reinstandpointdumbest.com/"], :root a[data-obtrack^="http://paid.outbrain.com/network/redir?"], :root [href^="https://goldforyourfuture.com/clk.trk"] img, :root a[href^="http://wct.link/"], :root [href^="https://infinitytrk.com/"], :root [onclick^="location.href='http://www.reimageplus.com"], :root [id^="section-ad-banner"], :root .commercial-unit-mobile-top > div[data-pla="1"], :root [id^="chp_ads_block"], :root a[href^="https://go.julrdr.com/"], :root .trc_rbox_div .syndicatedItemUB, :root [href^="https://zone.gotrackier.com/"], :root [href^="https://www.targetingpartner.com/"], :root [href^="https://detachedbates.com/"], :root a[href^="https://fourwhenstatistics.com/"], :root [href^="https://www.restoro.com/"], :root div[id^="ad-position-"], :root a[href^="http://adultfriendfinder.com/go/page/landing"], :root a[href^="http://affiliate.glbtracker.com/"], :root a[href^="https://leg.xyz/?track="], :root a[href^="https://go.cmtaffiliates.com/"], :root [data-name="adaptiveConstructorAd"], :root [href^="https://optimizedelite.com/"] > img, :root a[href^="//thaudray.com/"], :root div[id^="crt-"][style], :root a[href^="http://adultgames.xxx/"], :root a[href^="https://traffic.bannerator.com/"], :root [href^="https://shiftnetwork.infusionsoft.com/go/"] > img, :root [href^="https://www.mypatriotsupply.com/"] > img, :root a[onmousedown^="this.href='http://paid.outbrain.com/network/redir?"][target="_blank"], :root [href^="https://secure.bmtmicro.com/servlets/"], :root a[href^="https://losingoldfry.com/"], :root .scroll-fixable.rail-right > .deals-rail, :root a[href^="https://oackoubs.com/"], :root a[href^="https://awptjmp.com/"], :root a[href^="https://go.goasrv.com/"], :root .commercial-unit-mobile-top > .v7hl4d, :root [href^="http://mypillow.com/"] > img, :root a[href^="http://bongacams.com/track?"], :root a[href^="https://fleshlight.sjv.io/"], :root [data-ad-manager-id], :root a[href^="https://promo-bc.com/"], :root a[href^="https://clicks.pipaffiliates.com/"], :root [href^="https://noqreport.com/"] > img, :root a[href^="https://go.hpyjmp.com"], :root ADS-RIGHT, :root [href^="https://mystore.com/"] > img, :root [href^="https://mypatriotsupply.com/"] > img, :root [href^="https://mylead.global/stl/"] > img, :root #leader-companion > a[href], :root a[href^="https://transfer.xe.com/signup/track/redirect?"], :root .vid-present > .van_vid_carousel__padding, :root a[href^="https://go.xxxijmp.com"], :root [href^="https://istlnkcl.com/"], :root [href^="https://www.hostg.xyz/"] > img, :root .section-subheader > .section-hotel-prices-header, :root [href^="https://go.affiliatexe.com/"], :root [href^="https://go.4rabettraff.com/"], :root [href^="https://glersakr.com/"], :root ins.adsbygoogle, :root a[href^="https://1startfiledownload1.com/"], :root a[href^="https://wittered-mainging.com/"], :root [href^="https://engine.gettopple.com/"], :root [href^="https://awbbjmp.com/"], :root a[href^="https://k2s.cc/pr/"], :root [href^="https://affect3dnetwork.com/track/"], :root a[href^="https://go.currency.com/"], :root [href^="http://www.mypillow.com/"] > img, :root [href^="https://v.investologic.co.uk/"], :root [href^="https://cipledecline.buzz/"], :root [href^="http://join.trannies-fuck.com/"], :root [href^="http://www.fleshlightgirls.com/"], :root div[id^="div-ads-"], :root [href^="https://rapidgator.net/article/premium/ref/"], :root a[href^="https://www.sugarinstant.com/?partner_id="], :root a[href^="https://adultfriendfinder.com/go/page/landing"], :root div[data-role="sidebarAd"], :root [href^="https://join3.bannedsextapes.com"], :root div[data-spotim-slot], :root [href^="https://antiagingbed.com/discount/"] > img, :root a[href^="https://go.247traffic.com/"], :root [href^="https://join.girlsoutwest.com/"], :root [href^="http://trafficare.net/"], :root a[href^="https://tc.tradetracker.net/"] > img, :root a[href^="https://adserver.adreactor.com/"], :root [href^="http://join.shemalesfromhell.com/"], :root [id^="ad_slider"], :root a[href^="http://www.adultdvdempire.com/?partner_id="][href*="&utm_"], :root [href^="http://join.shemale.xxx/"], :root [href^="https://ilovemyfreedoms.com/landing-"], :root a[href^="https://ads.betfair.com/redirect.aspx?"], :root .trc_rbox .syndicatedItem, :root a[href^="http://cam4com.go2cloud.org/aff_c?"], :root a[href^="https://cpmspace.com/"], :root [href^="https://freecourseweb.com/"] > .sitefriend, :root [class^="adDisplay-module"], :root [class^="chp_ads_block"], :root a[href^="https://ads.planetwin365affiliate.com/redirect.aspx?"], :root [href^="http://join.rodneymoore.com/"], :root a[href^="https://www.privateinternetaccess.com/"] > img, :root a[href*=".trust.zone"], :root [href^="https://shrugartisticelder.com"], :root [href^="https://go.xlrdr.com"], :root [name^="google_ads_iframe"], :root [href^="https://safer-redirection.com"], :root [href^="//ngeoziadiyc4hi2e.com/"], :root a[href^="https://go.xxxjmp.com"], :root [data-desktop-ad-id], :root [href^="https://wct.link/"], :root #kt_player > a[target="_blank"], :root [href="https://www.masstortfinancing.com/"] > img, :root .ob_container .item-container-obpd, :root [id^="div-gpt-ad"], :root [href^="https://mypillow.com/"] > img, :root [href^="https://ad.admitad.com/"], :root a[href^="https://u.expresstech.io/"], :root [href="https://jdrucker.com/gold"] > img, :root a[href^="https://www.iyalc.com/"], :root a[href^="https://track.ultravpn.com/"], :root [href^="https://goldcometals.com/clk.trk"], :root [data-mobile-ad-id], :root a[href^="http://tc.tradetracker.net/"] > img, :root a[href^="https://www.geekbuying.com/dynamic-ads/"], :root a[href^="http://affiliates.thrixxx.com/"], :root #searchResultsList > div > div[onclick$="'inline.ad'});"], :root a[href^="https://trk.sportsflix4k.club/"], :root a[href^="https://go.xlivrdr.com"], :root [data-ez-name], :root AMP-AD, :root [data-ad-cls], :root a[href^="https://www.goldenfrog.com/vyprvpn?offer_id="][href*="&aff_id="], :root [id^="ad-wrap-"], :root div[id^="taboola-stream-"], :root [href^="https://go.astutelinks.com/"], :root [onclick*="content.ad/"], :root [href^="http://residenceseeingstanding.com/"], :root div[data-adunit], :root app-large-ad, :root [href^="https://turtlebids.irauctions.com/"] img, :root [class^="amp-ad-"], :root [href^="https://affiliate.fastcomet.com/"] > img, :root a[href^="http://go.xtbaffiliates.com/"], :root .grid > .container > #aside-promotion, :root DFP-AD, :root AD-SLOT, :root .ob_dual_right > .ob_ads_header ~ .odb_div, :root [href^="https://click2cvs.com/"], :root .trc_related_container div[data-item-syndicated="true"], :root [href^="http://join.shemalepornstar.com/"], :root a[href^="https://go.xlviiirdr.com"], :root .trc_rbox_div .syndicatedItem, :root [data-ad-module], :root [href^="https://trackfin.asia/"], :root .plistaList > .plista_widget_underArticle_item[data-type="pet"], :root a[href*="//lkstrck2.com/"], :root .plistaList > .itemLinkPET, :root atf-ad-slot, :root .commercial-unit-mobile-top .jackpot-main-content-container > .UpgKEd + .nZZLFc > div > .vci, :root a[href^="http://partners.etoro.com/"], :root [data-advadstrackid], :root #atvcap + #tvcap > .mnr-c > .commercial-unit-mobile-top, :root a[href^="https://traffdaq.com/"], :root a[href^="https://tm-offers.gamingadult.com/"], :root [class^="div-gpt-ad"], :root a[href^="https://bs.serving-sys.com"], :root [href^="https://www.cloudways.com/en/?id"], :root a[href^="https://refpazkjixes.top/"], :root #mgb-container > #mgb, :root a[href^="https://join.virtuallust3d.com/"], :root #taw > .med + div > #tvcap > .mnr-c:not(.qs-ic) > .commercial-unit-mobile-top, :root [data-adblockkey] { display: none !important; }</style><meta name="shimejiBrowserExtensionId" content="gohjpllcolmccldfdggmamodembldgpc" data-version="1.6.5"><style type="text/css">
+@charset "UTF-8";
+/*!
+* jQuery contextMenu - Plugin for simple contextMenu handling
+*
+* Version: v2.5.0
+*
+* Authors: Björn Brala (SWIS.nl), Rodney Rehm, Addy Osmani (patches for FF)
+* Web: http://swisnl.github.io/jQuery-contextMenu/
+*
+* Copyright (c) 2011-2017 SWIS BV and contributors
+*
+* Licensed under
+*   MIT License http://www.opensource.org/licenses/mit-license
+*
+* Date: 2017-05-25T11:30:28.663Z
+*/
+@-webkit-keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+@-o-keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+       -o-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+       -o-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+@keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+       -o-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+       -o-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+
+@font-face {
+font-family: "context-menu-icons";
+font-style: normal;
+font-weight: normal;
+
+src: url("font/context-menu-icons.eot?4yg1f");
+src: url("font/context-menu-icons.eot?4yg1f#iefix") format("embedded-opentype"), url("font/context-menu-icons.woff2?4yg1f") format("woff2"), url("font/context-menu-icons.woff?4yg1f") format("woff"), url("font/context-menu-icons.ttf?4yg1f") format("truetype");
+}
+
+.context-menu-icon-add:before {
+content: "EA01";
+}
+
+.context-menu-icon-copy:before {
+content: "EA02";
+}
+
+.context-menu-icon-cut:before {
+content: "EA03";
+}
+
+.context-menu-icon-delete:before {
+content: "EA04";
+}
+
+.context-menu-icon-edit:before {
+content: "EA05";
+}
+
+.context-menu-icon-loading:before {
+content: "EA06";
+}
+
+.context-menu-icon-paste:before {
+content: "EA07";
+}
+
+.context-menu-icon-quit:before {
+content: "EA08";
+}
+
+.context-menu-icon::before {
+position: absolute;
+top: 50%;
+left: 0;
+width: 2em;
+font-family: "context-menu-icons";
+font-size: 1em;
+font-style: normal;
+font-weight: normal;
+line-height: 1;
+color: #2980b9;
+text-align: center;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+
+.context-menu-icon.context-menu-hover:before {
+color: #fff;
+}
+
+.context-menu-icon.context-menu-disabled::before {
+color: #bbb;
+}
+
+.context-menu-icon.context-menu-icon-loading:before {
+-webkit-animation: cm-spin 2s infinite;
+     -o-animation: cm-spin 2s infinite;
+        animation: cm-spin 2s infinite;
+}
+
+.context-menu-icon.context-menu-icon--fa {
+display: list-item;
+font-family: inherit;
+}
+.context-menu-icon.context-menu-icon--fa::before {
+position: absolute;
+top: 50%;
+left: 0;
+width: 2em;
+font-family: FontAwesome;
+font-size: 1em;
+font-style: normal;
+font-weight: normal;
+line-height: 1;
+color: #2980b9;
+text-align: center;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+.context-menu-icon.context-menu-icon--fa.context-menu-hover:before {
+color: #fff;
+}
+.context-menu-icon.context-menu-icon--fa.context-menu-disabled::before {
+color: #bbb;
+}
+
+.context-menu-list {
+position: absolute;
+display: inline-block;
+min-width: 13em;
+max-width: 26em;
+padding: .25em 0;
+margin: .3em;
+font-family: inherit;
+font-size: inherit;
+list-style-type: none;
+background: #fff;
+border: 1px solid #bebebe;
+border-radius: .2em;
+-webkit-box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+}
+
+.context-menu-item {
+position: relative;
+padding: .2em 2em;
+color: #2f2f2f;
+-webkit-user-select: none;
+   -moz-user-select: none;
+    -ms-user-select: none;
+        user-select: none;
+background-color: #fff;
+}
+
+.context-menu-separator {
+padding: 0;
+margin: .35em 0;
+border-bottom: 1px solid #e6e6e6;
+}
+
+.context-menu-item > label > input,
+.context-menu-item > label > textarea {
+-webkit-user-select: text;
+   -moz-user-select: text;
+    -ms-user-select: text;
+        user-select: text;
+}
+
+.context-menu-item.context-menu-hover {
+color: #fff;
+cursor: pointer;
+background-color: #2980b9;
+}
+
+.context-menu-item.context-menu-disabled {
+color: #bbb;
+cursor: default;
+background-color: #fff;
+}
+
+.context-menu-input.context-menu-hover {
+color: #2f2f2f;
+cursor: default;
+}
+
+.context-menu-submenu:after {
+position: absolute;
+top: 50%;
+right: .5em;
+z-index: 1;
+width: 0;
+height: 0;
+content: '';
+border-color: transparent transparent transparent #2f2f2f;
+border-style: solid;
+border-width: .25em 0 .25em .25em;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+}
+
+/**
+* Inputs
+*/
+.context-menu-item.context-menu-input {
+padding: .3em .6em;
+}
+
+/* vertically align inside labels */
+.context-menu-input > label > * {
+vertical-align: top;
+}
+
+/* position checkboxes and radios as icons */
+.context-menu-input > label > input[type="checkbox"],
+.context-menu-input > label > input[type="radio"] {
+position: relative;
+top: .12em;
+margin-right: .4em;
+}
+
+.context-menu-input > label {
+margin: 0;
+}
+
+.context-menu-input > label,
+.context-menu-input > label > input[type="text"],
+.context-menu-input > label > textarea,
+.context-menu-input > label > select {
+display: block;
+width: 100%;
+-webkit-box-sizing: border-box;
+   -moz-box-sizing: border-box;
+        box-sizing: border-box;
+}
+
+.context-menu-input > label > textarea {
+height: 7em;
+}
+
+.context-menu-item > .context-menu-list {
+top: .3em;
+/* re-positioned by js */
+right: -.3em;
+display: none;
+}
+
+.context-menu-item.context-menu-visible > .context-menu-list {
+display: block;
+}
+
+.context-menu-accesskey {
+text-decoration: underline;
+}
+</style><style type="text/css">
+@import url('https://fonts.googleapis.com/css?family=Lato');
+
+.context-menu-list {
+font-family: 'Lato', sans-serif !important;
+font-size: 14px;
+text-align: left;
+font-weight: normal;
+width: 200px;
+}
+.context-menu-item {
+font-weight: inherit;
+font-size: inherit;
+line-height: inherit;
+text-align: left;
+}
+.contextmenu-item-custom.contextmenu-item-custom__accent:not(:hover) {
+background-color: #f8ffeb;
+}
+.contextmenu-item-custom.contextmenu-item-custom__success:not(:hover) {
+background-color: #eeffcd;
+}
+</style><style type="text/css">:root zeus-ad, :root topadblock, :root span[id^="ezoic-pub-ad-placeholder-"], :root guj-ad, :root gpt-ad, :root div[jsdata*="CarouselPLA-"][data-id^="CarouselPLA-"], :root div[id^="zergnet-widget"], :root div[id^="yandex_ad"], :root div[id^="vuukle-ad-"], :root div[id^="sticky_ad_"], :root div[id^="rc-widget-"], :root div[id^="lazyad-"], :root div[id^="gpt_ad_"], :root div[id^="ezoic-pub-ad-"], :root div[id^="div-gpt-"], :root div[id^="dfp-ad-"], :root div[id^="advads_ad_"], :root div[id^="adspot-"], :root div[id^="ads300_250-widget-"], :root div[id^="ads300_100-widget-"], :root div[id^="ads250_250-widget-"], :root div[id^="adrotate_widgets-"], :root div[id^="adngin-"], :root div[id^="_vdo_ads_player_ai_"], :root div[id*="ScriptRoot"], :root div[id*="MarketGid"], :root div[data-native_ad], :root div[data-mpu1], :root div[data-insertion], :root div[data-id-advertdfpconf], :root div[data-google-query-id], :root hl-adsense, :root div[data-contentexchange-widget], :root div[data-content="Advertisement"], :root div[data-alias="300x250 Ad 2"], :root div[data-alias="300x250 Ad 1"], :root div[data-adzone], :root div[data-adunit-path], :root div[data-ad-wrapper], :root div[data-ad-targeting], :root div[data-ad-placeholder], :root div[class^="native-ad-"], :root div[data-dfp-id], :root div[class^="kiwi-ad-wrapper"], :root div[class^="Adstyled__AdWrapper-"], :root div[aria-label="Ads"], :root display-ads, :root display-ad-component, :root aside[id^="adrotate_widgets-"], :root article.ad, :root ark-top-ad, :root app-advertisement, :root app-ad, :root amp-fx-flying-carpet, :root amp-embed[type="taboola"], :root amp-connatix-player, :root amp-ad-custom, :root ad-shield-ads, :root ad-desktop-sidebar, :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"] + .ob_source, :root a[onmousedown^="this.href='https://paid.outbrain.com/network/redir?"][target="_blank"], :root a[onmousedown^="this.href='http://paid.outbrain.com/network/redir?"][target="_blank"] + .ob_source, :root a[href^="https://yogacomplyfuel.com/"], :root a[href^="https://bngpt.com/"], :root a[href^="https://www.sheetmusicplus.com/"][href*="?aff_id="], :root a[href^="https://www.mypornstarcams.com/landing/click/"], :root a[href^="https://financeads.net/tc.php?"], :root a[href^="https://www.mrskin.com/tour"], :root a[href^="https://www.kingsoffetish.com/tour?partner_id="], :root a[href^="https://www.infowarsstore.com/"] > img, :root a[href^="https://t.grtyi.com/"], :root a[href^="https://www.highperformancecpmgate.com/"], :root a[href^="https://www.highcpmrevenuenetwork.com/"], :root a[href^="https://www.get-express-vpn.com/offer/"], :root a[href^="https://www.financeads.net/tc.php?"], :root a[href^="https://www.brazzersnetwork.com/landing/"], :root div[class^="Display_displayAd"], :root a[href^="https://www.sheetmusicplus.com/?aff_id="], :root a[href^="https://www.bang.com/?aff="], :root [data-template-type="nativead"], :root a[href^="https://www.adultempire.com/"][href*="?partner_id="], :root a[href^="https://webroutetrk.com/"], :root a[href^="https://wantopticalfreelance.com/"], :root a[href^="https://twinrdsyn.com/"], :root a[href^="https://tsartech.g2afse.com/"], :root a[href^="https://tragency-clesburg.icu/"], :root a[href^="https://tracking.avapartner.com/"], :root a[href^="https://track.afcpatrk.com/"], :root a[href^="https://track.adform.net/"], :root a[href^="https://torguard.net/aff.php"] > img, :root [data-role="tile-ads-module"], :root a[href^="https://adsrv4k.com/"], :root a[href^="https://go.xlviirdr.com"], :root a[href^="https://thaudray.com/"], :root a[href^="https://taghaugh.com/"], :root a[href^="https://www.sweetdeals.com"], :root [href^="https://zstacklife.com/"] img, :root a[href^="https://t.aslnk.link/"], :root a[href^="https://t.adating.link/"], :root [href^="https://track.fiverr.com/visit/"] > img, :root a[href^="https://go.trackitalltheway.com/"], :root a[href^="https://syndication.exoclick.com/"], :root a[href^="https://syndication.dynsrvtbg.com/"], :root a[href^="https://streamate.com/landing/click/"], :root a[href^="https://ad.doubleclick.net/"], :root a[href^="https://static.fleshlight.com/images/banners/"], :root a[href^="https://go.strpjmp.com/"], :root a[href^="https://refpa4903566.top/"], :root a[href^="https://prf.hn/click/"][href*="/camref:"] > img, :root a[href^="https://serve.awmdelivery.com/"], :root a[href^="https://prf.hn/click/"][href*="/adref:"] > img, :root [href^="https://r.kraken.com/"], :root a[href^="https://mmwebhandler.aff-online.com/"], :root a[href^="https://www.bet365.com/"][href*="affiliate="], :root iframe[id^="google_ads_frame"], :root a[href^="https://pb-track.com/"], :root a[href^="https://paid.outbrain.com/network/redir?"], :root div[id^="ad_position_"], :root a[href^="https://ovb.im/"], :root div[id^="ad-div-"], :root a[href^="https://newbinotracs.com/"], :root a[href^="https://natour.naughtyamerica.com/track/"], :root [href^="https://stvkr.com/"], :root a[href^="https://mediaserver.entainpartners.com/renderBanner.do?"], :root [href^="https://www.herbanomic.com/"] > img, :root a[href^="//moksoxos.com/"], :root a[href^="https://maymooth-stopic.com/"], :root a[href^="https://loboclick.com"], :root [href^="https://routewebtk.com/"], :root a[href^="https://see.kmisln.com/"], :root a[href^="https://a.bestcontentweb.top/"], :root a[href^="https://lobimax.com/"], :root a[href^="https://lead1.pl/"], :root a[href^="https://landing.brazzersnetwork.com/"], :root a[href^="https://ads.leovegas.com/redirect.aspx?"], :root a[href^="https://land.brazzersnetwork.com/landing/"], :root a[href^="https://juicyads.in/"], :root a[href^="https://itubego.com/video-downloader/?affid="], :root a[href^="https://iqbroker.com/"][href*="?aff="], :root a[href^="https://incisivetrk.cvtr.io/click?"], :root a[href^="https://iactrivago.ampxdirect.com/"], :root [data-revive-zoneid], :root a[href^="https://googleads.g.doubleclick.net/pcs/click"], :root a[href^="https://clk.wrenchsound.store/"], :root a[href^="https://go.zybrdr.com"], :root [href^="http://join.michelle-austin.com/"], :root a[href^="https://go.xxxiijmp.com"], :root a[href^="https://go.xtbaffiliates.com/"], :root a[href^="https://ismlks.com/"], :root [href^="https://www.mypillow.com/"] > img, :root a[href^="https://azpresearch.club/"], :root a[href^="https://go.xlirdr.com"], :root [data-css-class="dfp-inarticle"], :root .card-captioned.crd > .crd--cnt > .s2nPlayer, :root a[href^="https://go.tmrjmp.com"], :root a[href^="https://go.skinstrip.net"][href*="?campaignId="], :root a[href^="https://go.markets.com/visit/?bta="], :root a[href^="//lambingsyddir.com/"], :root a[href^="https://billing.purevpn.com/aff.php"] > img, :root a[href^="https://go.hpyrdr.com/"], :root a[href^="https://go.goaserv.com/"], :root a[href^="https://track.wg-aff.com"], :root a[href^="https://go.ebrokerserve.com/"], :root a[href^="https://go.dmzjmp.com"], :root a[href^="https://go.admjmp.com/"], :root a[href^="https://www.nutaku.net/signup/landing/"], :root [href^="https://kingered-banctours.com/"], :root a[href^="https://get.surfshark.net/aff_c?"][href*="&aff_id="] > img, :root a-ad, :root a[href^="https://affiliate.rusvpn.com/click.php?"], :root a[href^="https://geniusdexchange.com/"], :root a[href^="https://go.gldrdr.com/"], :root [id^="ad_sky"], :root a[href^="https://funkydaters.com/"], :root a[href^="https://frameworkdeserve.com/"], :root a[href^="https://flirtandsweets.life/"], :root a[href^="https://www.mrskin.com/account/"], :root bottomadblock, :root a[href^="https://fertilitycommand.com/"], :root [data-freestar-ad], :root a[href^="https://fc.lc/ref/"], :root div[data-native-ad], :root a[href^="https://engine.trackingdesks.com/"], :root [href^="https://totlnkcl.com/"], :root a[href^="https://www.adskeeper.com"], :root a[data-redirect^="https://paid.outbrain.com/network/redir?"], :root [href^="https://www.reimageplus.com/"], :root a[href^="https://engine.phn.doublepimp.com/"], :root a[href^="https://engine.blueistheneworanges.com/"], :root a[href^="https://clixtrac.com/"], :root div.fadeInDown[id$="____equal"][class$="____equal"], :root a[href^="https://mediaserver.gvcaffiliates.com/renderBanner.do?"], :root a[href^="https://join.dreamsexworld.com/"], :root a[href^="https://click.linksynergy.com/fs-bin/"], :root AD-TRIPLE-BOX, :root a[href^="https://click.hoolig.app/"], :root a[href^="https://track.totalav.com/"], :root img[src^="https://images.purevpnaffiliates.com"], :root a[href^="https://porntubemate.com/"], :root a[href^="http://www.gfrevenge.com/landing/"], :root a[href^="https://clickadilla.com/"], :root a[href^="https://click.dtiserv2.com/"], :root a[href^="https://go.xlvirdr.com"], :root a[href^="https://claring-loccelkin.com/"], :root [class^="s2nPlayer"], :root a[href^="https://chaturbate.jjgirls.com/?track="], :root a[href^="https://www.nudeidols.com/cams/"], :root a[href^="https://chaturbate.com/in/?track="], :root a[href^="https://www.onlineusershielder.com/"], :root a[href^="https://chaturbate.com/in/?tour="], :root a[href^="https://cams.imagetwist.com/in/?track="], :root a[href^="https://camfapr.com/landing/click/"], :root a[href^="https://cam4com.go2cloud.org/"], :root a[href^="https://affcpatrk.com/"], :root a[href^="https://bongacams2.com/track?"], :root a[href^="https://bluedelivery.pro/"], :root #topstuff > #tads, :root a[href^="https://black77854.com/"], :root a[href^="https://burpee.xyz/"], :root a[href^="https://ndt5.net/"], :root a[href^="https://batheunits.com/"], :root a[target="_blank"][onmousedown="this.href^='http://paid.outbrain.com/network/redir?"], :root a[href^="https://banners.livepartners.com/"], :root a[href^="https://m.do.co/c/"] > img, :root [href="https://masstortfinancing.com"] img, :root a[href^="https://bongacams10.com/track?"], :root a[href^="https://albionsoftwares.com/"], :root a[href^="https://t.hrtye.com/"], :root a[href^="https://go.etoro.com/"] > img, :root a[href^="https://join.sexworld3d.com/track/"], :root a[href^="https://intenseaffiliates.com/redirect/"], :root a[href^="https://aweptjmp.com/"], :root a[href^="https://ads.ad4game.com/"], :root [id^="google_ads_iframe"], :root a[href^="https://syndication.optimizesrv.com/"], :root a[href^="https://affpa.top/"], :root a[href^="https://adnetwrk.com/"], :root a[href^="https://adjoincomprise.com/"], :root [href^="http://misslinkvocation.com/"], :root a[href^="https://adclick.g.doubleclick.net/"], :root a[href^="https://go.nordvpn.net/aff"] > img, :root [href^="http://clicks.totemcash.com/"], :root a[href^="https://misspkl.com/"], :root a[href^="https://ad.zanox.com/ppc/"] > img, :root a[href^="https://ad.kubiccomps.icu/"], :root a[href^="https://adswick.com/"], :root a[href^="https://a2.adform.net/"], :root [data-m-ad-id], :root a[href^="https://a-ads.com/"], :root [href="https://ourgoldguy.com/contact/"] img, :root a[href^="https://brightadnetwork.com/"], :root [href^="https://www.avantlink.com/click.php"] img, :root iframe[src^="https://pagead2.googlesyndication.com/"], :root a[href^="http://www.onwebcam.com/random?t_link="], :root a[href^="https://agacelebir.com/"], :root a[href^="https://spygasm.com/track?"], :root a[href^="http://d2.zedo.com/"], :root a[href^="http://www.friendlyduck.com/AF_"], :root a[href^="http://trk.globwo.online/"], :root a[href^="https://prf.hn/click/"][href*="/creativeref:"] > img, :root a[href^="http://www.adultempire.com/unlimited/promo?"][href*="&partner_id="], :root a[href^="http://traffic.tc-clicks.com/"], :root a[href^="http://tour.mrskin.com/"], :root a[href^="https://join.virtualtaboo.com/track/"], :root a[href^="http://https://www.get-express-vpn.com/offer/"], :root a[href^="https://cagothie.net/"], :root div[id^="google_dfp_"], :root a[href^="http://googleads.g.doubleclick.net/pcs/click"], :root a[href^="https://awentw.com/"], :root a[href^="https://www.googleadservices.com/pagead/aclk?"], :root a[href^="http://www.mrskin.com/tour"], :root a[href^="https://www.purevpn.com/"][href*="&utm_source=aff-"], :root a[href^="http://deloplen.com/"], :root .rc-cta[data-target], :root [href^="http://go.cm-trk2.com/"], :root a[href^="http://adtrack1.club/"], :root a[href^="http://click.payserve.com/"], :root a[href^="https://porngames.adult/?SID="], :root a[href^="https://landing1.brazzersnetwork.com"], :root #slashboxes > .deals-rail, :root [href^="http://globsads.com/"], :root [href^="https://www.brighteonstore.com/products/"] img, :root a[href^="http://bc.vc/?r="], :root .trc_rbox_border_elm .syndicatedItem, :root a[href^="http://www.onclickmega.com/jump/next.php?"], :root a[href^="http://adf.ly/?id="], :root [href^="http://homemoviestube.com/"], :root a[href^="http://ad.doubleclick.net/"], :root .commercial-unit-mobile-top .jackpot-main-content-container > .UpgKEd + .nZZLFc > .vci, :root a[href^="//syndication.dynsrvtbg.com/"], :root a[href^="http://static.fleshlight.com/images/banners/"], :root a[href^="https://a.adtng.com/"], :root a[href^="//pubads.g.doubleclick.net/"], :root [href^="https://traffserve.com/"], :root div[data-adname], :root a[href^="https://thechleads.pro/"], :root a[href^="//intorterraon.com/"], :root a[href^="https://fastestvpn.com/lifetime-special-deal?a_aid="], :root a[href^="https://tour.mrskin.com/"], :root a[href^="http://allaptair.club/"], :root a[href^="//go.eabids.com/"], :root [data-d-ad-id], :root a[href*=".engine.adglare.net/"], :root a[href^="https://a.bestcontentoperation.top/"], :root a[href^="//go.xlviiirdr.com"], :root [data-dynamic-ads], :root a[data-widget-outbrain-redirect^="http://paid.outbrain.com/network/redir?"], :root [data-ad-width], :root [href^="https://join.playboyplus.com/track/"], :root a[data-url^="http://paid.outbrain.com/network/redir?"] + .author, :root a[href^="https://axdsz.pro/"], :root a[href^="http://bodelen.com/"], :root a[data-oburl^="https://paid.outbrain.com/network/redir?"], :root [href^="https://cpa.10kfreesilver.com/"], :root a[href^="https://a.bestcontentfood.top/"], :root a[href^="https://reinstandpointdumbest.com/"], :root a[data-obtrack^="http://paid.outbrain.com/network/redir?"], :root [href^="https://goldforyourfuture.com/clk.trk"] img, :root a[href^="http://wct.link/"], :root [href^="https://infinitytrk.com/"], :root [onclick^="location.href='http://www.reimageplus.com"], :root [id^="section-ad-banner"], :root .commercial-unit-mobile-top > div[data-pla="1"], :root [id^="chp_ads_block"], :root a[href^="https://go.julrdr.com/"], :root .trc_rbox_div .syndicatedItemUB, :root [href^="https://zone.gotrackier.com/"], :root [href^="https://www.targetingpartner.com/"], :root [href^="https://detachedbates.com/"], :root a[href^="https://fourwhenstatistics.com/"], :root [href^="https://www.restoro.com/"], :root div[id^="ad-position-"], :root a[href^="http://adultfriendfinder.com/go/page/landing"], :root a[href^="http://affiliate.glbtracker.com/"], :root a[href^="https://leg.xyz/?track="], :root a[href^="https://go.cmtaffiliates.com/"], :root [data-name="adaptiveConstructorAd"], :root [href^="https://optimizedelite.com/"] > img, :root a[href^="//thaudray.com/"], :root div[id^="crt-"][style], :root a[href^="http://adultgames.xxx/"], :root a[href^="https://traffic.bannerator.com/"], :root [href^="https://shiftnetwork.infusionsoft.com/go/"] > img, :root [href^="https://www.mypatriotsupply.com/"] > img, :root a[onmousedown^="this.href='http://paid.outbrain.com/network/redir?"][target="_blank"], :root [href^="https://secure.bmtmicro.com/servlets/"], :root a[href^="https://losingoldfry.com/"], :root .scroll-fixable.rail-right > .deals-rail, :root a[href^="https://oackoubs.com/"], :root a[href^="https://awptjmp.com/"], :root a[href^="https://go.goasrv.com/"], :root .commercial-unit-mobile-top > .v7hl4d, :root [href^="http://mypillow.com/"] > img, :root a[href^="http://bongacams.com/track?"], :root a[href^="https://fleshlight.sjv.io/"], :root [data-ad-manager-id], :root a[href^="https://promo-bc.com/"], :root a[href^="https://clicks.pipaffiliates.com/"], :root [href^="https://noqreport.com/"] > img, :root a[href^="https://go.hpyjmp.com"], :root ADS-RIGHT, :root [href^="https://mystore.com/"] > img, :root [href^="https://mypatriotsupply.com/"] > img, :root [href^="https://mylead.global/stl/"] > img, :root #leader-companion > a[href], :root a[href^="https://transfer.xe.com/signup/track/redirect?"], :root .vid-present > .van_vid_carousel__padding, :root a[href^="https://go.xxxijmp.com"], :root [href^="https://istlnkcl.com/"], :root [href^="https://www.hostg.xyz/"] > img, :root .section-subheader > .section-hotel-prices-header, :root [href^="https://go.affiliatexe.com/"], :root [href^="https://go.4rabettraff.com/"], :root [href^="https://glersakr.com/"], :root ins.adsbygoogle, :root a[href^="https://1startfiledownload1.com/"], :root a[href^="https://wittered-mainging.com/"], :root [href^="https://engine.gettopple.com/"], :root [href^="https://awbbjmp.com/"], :root a[href^="https://k2s.cc/pr/"], :root [href^="https://affect3dnetwork.com/track/"], :root a[href^="https://go.currency.com/"], :root [href^="http://www.mypillow.com/"] > img, :root [href^="https://v.investologic.co.uk/"], :root [href^="https://cipledecline.buzz/"], :root [href^="http://join.trannies-fuck.com/"], :root [href^="http://www.fleshlightgirls.com/"], :root div[id^="div-ads-"], :root [href^="https://rapidgator.net/article/premium/ref/"], :root a[href^="https://www.sugarinstant.com/?partner_id="], :root a[href^="https://adultfriendfinder.com/go/page/landing"], :root div[data-role="sidebarAd"], :root [href^="https://join3.bannedsextapes.com"], :root div[data-spotim-slot], :root [href^="https://antiagingbed.com/discount/"] > img, :root a[href^="https://go.247traffic.com/"], :root [href^="https://join.girlsoutwest.com/"], :root [href^="http://trafficare.net/"], :root a[href^="https://tc.tradetracker.net/"] > img, :root a[href^="https://adserver.adreactor.com/"], :root [href^="http://join.shemalesfromhell.com/"], :root [id^="ad_slider"], :root a[href^="http://www.adultdvdempire.com/?partner_id="][href*="&utm_"], :root [href^="http://join.shemale.xxx/"], :root [href^="https://ilovemyfreedoms.com/landing-"], :root a[href^="https://ads.betfair.com/redirect.aspx?"], :root .trc_rbox .syndicatedItem, :root a[href^="http://cam4com.go2cloud.org/aff_c?"], :root a[href^="https://cpmspace.com/"], :root [href^="https://freecourseweb.com/"] > .sitefriend, :root [class^="adDisplay-module"], :root [class^="chp_ads_block"], :root a[href^="https://ads.planetwin365affiliate.com/redirect.aspx?"], :root [href^="http://join.rodneymoore.com/"], :root a[href^="https://www.privateinternetaccess.com/"] > img, :root a[href*=".trust.zone"], :root [href^="https://shrugartisticelder.com"], :root [href^="https://go.xlrdr.com"], :root [name^="google_ads_iframe"], :root [href^="https://safer-redirection.com"], :root [href^="//ngeoziadiyc4hi2e.com/"], :root a[href^="https://go.xxxjmp.com"], :root [data-desktop-ad-id], :root [href^="https://wct.link/"], :root #kt_player > a[target="_blank"], :root [href="https://www.masstortfinancing.com/"] > img, :root .ob_container .item-container-obpd, :root [id^="div-gpt-ad"], :root [href^="https://mypillow.com/"] > img, :root [href^="https://ad.admitad.com/"], :root a[href^="https://u.expresstech.io/"], :root [href="https://jdrucker.com/gold"] > img, :root a[href^="https://www.iyalc.com/"], :root a[href^="https://track.ultravpn.com/"], :root [href^="https://goldcometals.com/clk.trk"], :root [data-mobile-ad-id], :root a[href^="http://tc.tradetracker.net/"] > img, :root a[href^="https://www.geekbuying.com/dynamic-ads/"], :root a[href^="http://affiliates.thrixxx.com/"], :root #searchResultsList > div > div[onclick$="'inline.ad'});"], :root a[href^="https://trk.sportsflix4k.club/"], :root a[href^="https://go.xlivrdr.com"], :root [data-ez-name], :root AMP-AD, :root [data-ad-cls], :root a[href^="https://www.goldenfrog.com/vyprvpn?offer_id="][href*="&aff_id="], :root [id^="ad-wrap-"], :root div[id^="taboola-stream-"], :root [href^="https://go.astutelinks.com/"], :root [onclick*="content.ad/"], :root [href^="http://residenceseeingstanding.com/"], :root div[data-adunit], :root app-large-ad, :root [href^="https://turtlebids.irauctions.com/"] img, :root [class^="amp-ad-"], :root [href^="https://affiliate.fastcomet.com/"] > img, :root a[href^="http://go.xtbaffiliates.com/"], :root .grid > .container > #aside-promotion, :root DFP-AD, :root AD-SLOT, :root .ob_dual_right > .ob_ads_header ~ .odb_div, :root [href^="https://click2cvs.com/"], :root .trc_related_container div[data-item-syndicated="true"], :root [href^="http://join.shemalepornstar.com/"], :root a[href^="https://go.xlviiirdr.com"], :root .trc_rbox_div .syndicatedItem, :root [data-ad-module], :root [href^="https://trackfin.asia/"], :root .plistaList > .plista_widget_underArticle_item[data-type="pet"], :root a[href*="//lkstrck2.com/"], :root .plistaList > .itemLinkPET, :root atf-ad-slot, :root .commercial-unit-mobile-top .jackpot-main-content-container > .UpgKEd + .nZZLFc > div > .vci, :root a[href^="http://partners.etoro.com/"], :root [data-advadstrackid], :root #atvcap + #tvcap > .mnr-c > .commercial-unit-mobile-top, :root a[href^="https://traffdaq.com/"], :root a[href^="https://tm-offers.gamingadult.com/"], :root [class^="div-gpt-ad"], :root a[href^="https://bs.serving-sys.com"], :root [href^="https://www.cloudways.com/en/?id"], :root a[href^="https://refpazkjixes.top/"], :root #mgb-container > #mgb, :root a[href^="https://join.virtuallust3d.com/"], :root #taw > .med + div > #tvcap > .mnr-c:not(.qs-ic) > .commercial-unit-mobile-top, :root [data-adblockkey] { display: none !important; }</style><meta name="shimejiBrowserExtensionId" content="gohjpllcolmccldfdggmamodembldgpc" data-version="1.6.5"><style type="text/css">
+@charset "UTF-8";
+/*!
+* jQuery contextMenu - Plugin for simple contextMenu handling
+*
+* Version: v2.5.0
+*
+* Authors: Björn Brala (SWIS.nl), Rodney Rehm, Addy Osmani (patches for FF)
+* Web: http://swisnl.github.io/jQuery-contextMenu/
+*
+* Copyright (c) 2011-2017 SWIS BV and contributors
+*
+* Licensed under
+*   MIT License http://www.opensource.org/licenses/mit-license
+*
+* Date: 2017-05-25T11:30:28.663Z
+*/
+@-webkit-keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+@-o-keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+       -o-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+       -o-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+@keyframes cm-spin {
+0% {
+  -webkit-transform: translateY(-50%) rotate(0deg);
+       -o-transform: translateY(-50%) rotate(0deg);
+          transform: translateY(-50%) rotate(0deg);
+}
+100% {
+  -webkit-transform: translateY(-50%) rotate(359deg);
+       -o-transform: translateY(-50%) rotate(359deg);
+          transform: translateY(-50%) rotate(359deg);
+}
+}
+
+@font-face {
+font-family: "context-menu-icons";
+font-style: normal;
+font-weight: normal;
+
+src: url("font/context-menu-icons.eot?4yg1f");
+src: url("font/context-menu-icons.eot?4yg1f#iefix") format("embedded-opentype"), url("font/context-menu-icons.woff2?4yg1f") format("woff2"), url("font/context-menu-icons.woff?4yg1f") format("woff"), url("font/context-menu-icons.ttf?4yg1f") format("truetype");
+}
+
+.context-menu-icon-add:before {
+content: "EA01";
+}
+
+.context-menu-icon-copy:before {
+content: "EA02";
+}
+
+.context-menu-icon-cut:before {
+content: "EA03";
+}
+
+.context-menu-icon-delete:before {
+content: "EA04";
+}
+
+.context-menu-icon-edit:before {
+content: "EA05";
+}
+
+.context-menu-icon-loading:before {
+content: "EA06";
+}
+
+.context-menu-icon-paste:before {
+content: "EA07";
+}
+
+.context-menu-icon-quit:before {
+content: "EA08";
+}
+
+.context-menu-icon::before {
+position: absolute;
+top: 50%;
+left: 0;
+width: 2em;
+font-family: "context-menu-icons";
+font-size: 1em;
+font-style: normal;
+font-weight: normal;
+line-height: 1;
+color: #2980b9;
+text-align: center;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+
+.context-menu-icon.context-menu-hover:before {
+color: #fff;
+}
+
+.context-menu-icon.context-menu-disabled::before {
+color: #bbb;
+}
+
+.context-menu-icon.context-menu-icon-loading:before {
+-webkit-animation: cm-spin 2s infinite;
+     -o-animation: cm-spin 2s infinite;
+        animation: cm-spin 2s infinite;
+}
+
+.context-menu-icon.context-menu-icon--fa {
+display: list-item;
+font-family: inherit;
+}
+.context-menu-icon.context-menu-icon--fa::before {
+position: absolute;
+top: 50%;
+left: 0;
+width: 2em;
+font-family: FontAwesome;
+font-size: 1em;
+font-style: normal;
+font-weight: normal;
+line-height: 1;
+color: #2980b9;
+text-align: center;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+}
+.context-menu-icon.context-menu-icon--fa.context-menu-hover:before {
+color: #fff;
+}
+.context-menu-icon.context-menu-icon--fa.context-menu-disabled::before {
+color: #bbb;
+}
+
+.context-menu-list {
+position: absolute;
+display: inline-block;
+min-width: 13em;
+max-width: 26em;
+padding: .25em 0;
+margin: .3em;
+font-family: inherit;
+font-size: inherit;
+list-style-type: none;
+background: #fff;
+border: 1px solid #bebebe;
+border-radius: .2em;
+-webkit-box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+        box-shadow: 0 2px 5px rgba(0, 0, 0, .5);
+}
+
+.context-menu-item {
+position: relative;
+padding: .2em 2em;
+color: #2f2f2f;
+-webkit-user-select: none;
+   -moz-user-select: none;
+    -ms-user-select: none;
+        user-select: none;
+background-color: #fff;
+}
+
+.context-menu-separator {
+padding: 0;
+margin: .35em 0;
+border-bottom: 1px solid #e6e6e6;
+}
+
+.context-menu-item > label > input,
+.context-menu-item > label > textarea {
+-webkit-user-select: text;
+   -moz-user-select: text;
+    -ms-user-select: text;
+        user-select: text;
+}
+
+.context-menu-item.context-menu-hover {
+color: #fff;
+cursor: pointer;
+background-color: #2980b9;
+}
+
+.context-menu-item.context-menu-disabled {
+color: #bbb;
+cursor: default;
+background-color: #fff;
+}
+
+.context-menu-input.context-menu-hover {
+color: #2f2f2f;
+cursor: default;
+}
+
+.context-menu-submenu:after {
+position: absolute;
+top: 50%;
+right: .5em;
+z-index: 1;
+width: 0;
+height: 0;
+content: '';
+border-color: transparent transparent transparent #2f2f2f;
+border-style: solid;
+border-width: .25em 0 .25em .25em;
+-webkit-transform: translateY(-50%);
+    -ms-transform: translateY(-50%);
+     -o-transform: translateY(-50%);
+        transform: translateY(-50%);
+}
+
+/**
+* Inputs
+*/
+.context-menu-item.context-menu-input {
+padding: .3em .6em;
+}
+
+/* vertically align inside labels */
+.context-menu-input > label > * {
+vertical-align: top;
+}
+
+/* position checkboxes and radios as icons */
+.context-menu-input > label > input[type="checkbox"],
+.context-menu-input > label > input[type="radio"] {
+position: relative;
+top: .12em;
+margin-right: .4em;
+}
+
+.context-menu-input > label {
+margin: 0;
+}
+
+.context-menu-input > label,
+.context-menu-input > label > input[type="text"],
+.context-menu-input > label > textarea,
+.context-menu-input > label > select {
+display: block;
+width: 100%;
+-webkit-box-sizing: border-box;
+   -moz-box-sizing: border-box;
+        box-sizing: border-box;
+}
+
+.context-menu-input > label > textarea {
+height: 7em;
+}
+
+.context-menu-item > .context-menu-list {
+top: .3em;
+/* re-positioned by js */
+right: -.3em;
+display: none;
+}
+
+.context-menu-item.context-menu-visible > .context-menu-list {
+display: block;
+}
+
+.context-menu-accesskey {
+text-decoration: underline;
+}
+</style><style type="text/css">
+@import url('https://fonts.googleapis.com/css?family=Lato');
+
+.context-menu-list {
+font-family: 'Lato', sans-serif !important;
+font-size: 14px;
+text-align: left;
+font-weight: normal;
+width: 200px;
+}
+.context-menu-item {
+font-weight: inherit;
+font-size: inherit;
+line-height: inherit;
+text-align: left;
+}
+.contextmenu-item-custom.contextmenu-item-custom__accent:not(:hover) {
+background-color: #f8ffeb;
+}
+.contextmenu-item-custom.contextmenu-item-custom__success:not(:hover) {
+background-color: #eeffcd;
+}
+</style></head>
+<body bis_register="W3sibWFzdGVyIjp0cnVlLCJleHRlbnNpb25JZCI6ImVwcGlvY2VtaG1ubGJoanBsY2drb2ZjaWllZ29tY29uIiwiYWRibG9ja2VyU3RhdHVzIjp7IkRJU1BMQVkiOiJkaXNhYmxlZCIsIkZBQ0VCT09LIjoiZGlzYWJsZWQiLCJUV0lUVEVSIjoiZGlzYWJsZWQiLCJSRURESVQiOiJkaXNhYmxlZCJ9LCJ2ZXJzaW9uIjoiMS45LjA0Iiwic2NvcmUiOjEwOTA0fV0=">
+<div class="navbar" bis_skin_checked="1">
+<div class="navbar-content" bis_skin_checked="1">
+<div class="brand" bis_skin_checked="1">
+
+<h2>Ingression: Platforming with Portals
+</h2>
+</div>
+<div class="routes" bis_skin_checked="1">
+<a href="https://dancingwithfire.org/index-2.html">Home</a>
+<a href="https://dancingwithfire.org/#">Coming Soon</a>
+</div>
+</div>
+</div>
+<div class="base" bis_skin_checked="1">
+<div class="header" bis_skin_checked="1">
+<div class="banner" bis_skin_checked="1">
+<img src="https://cdn.cloudflare.steamstatic.com/steam/apps/1966970/header.jpg?t=1674408535" alt="banner">
+</div>
+<div class="description" bis_skin_checked="1">
+<h3>Ingression is an unforgiving &amp; mind-bending precision platformer where you'll think and platform with seamless portals. Play as Rina, a thief living in the year 2442 in the corrupt Galactic Empire. Travel to the future to save the past from a tremendous time paradox. Fulfill your destiny of keeping time intact.
+</h3>
+<br>
+
+</div>
+</div>
+<div class="divider" bis_skin_checked="1"></div>
+<div class="main" bis_skin_checked="1">
+<div class="logs" bis_skin_checked="1">
+<div class="title" bis_skin_checked="1">Development logs</div>
+<ul>
+<li>Portals</li>
+<li>Deadly Threats
+
+</li>
+<li>Unique Mechanics
+
+</li>
+<li>Mind-Bending Levels
+
+</li>
+</ul>
+</div>
+<div class="downloads" bis_skin_checked="1">
+<div class="title" bis_skin_checked="1">Download</div>
+<ul>
+<li><a href="https://cdn.discordapp.com/attachments/1080248294166503524/1081361830259196036/Ingression.rar">Windows v1.6</a></li>
+<li>Mac Unavailable</li>
+<li>Linux Unavailable</li>
+</ul>
+</div>
+</div>
+<div class="divider" bis_skin_checked="1"></div>
+<div class="footer" bis_skin_checked="1">
+<h3 class="title">Screenshots of the game</h3>
+<div class="screenshots" bis_skin_checked="1">
+<img src="https://cdn.cloudflare.steamstatic.com/steam/apps/1966970/ss_8fb959551c9bd172c2b164ae87a2865a504697e4.600x338.jpg?t=1674408535" alt="screenshot-1">
+<img src="https://cdn.cloudflare.steamstatic.com/steam/apps/1966970/ss_ae63744925a06df4a0637d15f7dacd0af48fe363.600x338.jpg?t=1674408535" alt="screenshot-2">
+<img src="https://cdn.cloudflare.steamstatic.com/steam/apps/1966970/ss_0296fb86f3698f27542b16e754c6738cc4e28fac.600x338.jpg?t=1674408535" alt="screenshot-3">
+</div>
+</div>
+</div>
+<div class="footer-end" bis_skin_checked="1">
+<h4>  </h4><br>
+<br>
+<br><br>
+</div>
+
+
+
+
+<div id="shimai-world" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 2147483647; pointer-events: none; background: transparent;" bis_skin_checked="1"></div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 157.195%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.287%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 6.96807%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 6.88789%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.43%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 31.0099%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 12.1049%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.8835%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 65.0105%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 18.9755%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.2; padding: 0px; margin: 0px; font-size: 3.6px; line-height: 14.8px; text-align: center; vertical-align: baseline; right: 73.2157%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 147.844%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 68.5188%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 23.8293%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 98.3001%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 59.7797%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 81.0082%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 22.413%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.55; padding: 0px; margin: 0px; font-size: 8.8px; line-height: 12.7px; text-align: center; vertical-align: baseline; right: 32.3395%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 17.4641%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 97.7669%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 49.9321%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 188.708%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 29.1523%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 10.1014%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 61.0516%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.65; padding: 0px; margin: 0px; font-size: 10.4px; line-height: 12.1px; text-align: center; vertical-align: baseline; right: 10.2758%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 78.9815%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 9.83131%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 81.241%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 40.6395%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 90.865%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 64.6343%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 72.1327%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 46.1845%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 43.7935%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.5378%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 43.7872%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 19.1438%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 81.6149%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 51.6591%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 25.2228%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 43.469%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 89.7061%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 144.317%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 23.2019%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.8952%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 69.5963%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 84.2675%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 110.874%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 15.2349%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 122.971%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 8.83073%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.25; padding: 0px; margin: 0px; font-size: 2.5px; line-height: 14.5px; text-align: center; vertical-align: baseline; right: 16.1762%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 108.127%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 16.487%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 79.1788%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 95.6901%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 95.7812%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 51.9749%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.9; padding: 0px; margin: 0px; font-size: 12.6px; line-height: 10.6px; text-align: center; vertical-align: baseline; right: 2.65164%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 66.2872%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 48.5945%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 97.3385%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 61.2739%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 80.7888%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 67.8197%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 47.3673%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 75.8538%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 2.08122%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 87.9493%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 45.8247%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 54.9104%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.2027%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 55.6171%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 94.2903%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 46.299%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 74.8395%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 36.8581%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 134.373%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.4655%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 3.46103%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 141.699%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 78.2161%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 76.1274%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 88.4883%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 22.9793%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 124.404%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 44.4716%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 126.508%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 77.9164%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 16.4596%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 37.1458%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 72.8814%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 10.746%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 11.8705%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 97.849%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 82.8736%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 109.235%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 43.7391%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0.185197%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 100.308%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 32.3956%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 96.2229%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 70.6541%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 49.0738%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 76.0377%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 36.6671%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.4; padding: 0px; margin: 0px; font-size: 4.8px; line-height: 13.6px; text-align: center; vertical-align: baseline; right: 59.0885%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 177.636%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 73.9667%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 113.845%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 98.5507%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 192.119%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 72.3027%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 184.345%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 34.89%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 195.101%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 17.445%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 179.02%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 38.1643%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 127.263%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 72.2491%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 198.616%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 26.087%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 137.593%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 36.6076%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 133.653%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 51.4224%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.606%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 30.059%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 107.135%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 67.9549%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 198.19%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 9.9839%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 156.656%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 67.6329%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 102.023%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 83.9506%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 126.518%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 40.8481%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 199.042%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 52.3349%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 156.55%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 18.4648%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 160.916%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 95.1691%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 105.964%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 83.1991%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 174.973%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 25.5502%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 173.589%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 25.4965%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 110.65%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 9.44713%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 156.55%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 42.351%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 194.995%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 37.7348%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 186.262%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 12.453%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 123.003%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 78.2072%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 158.04%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 72.0344%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.073%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 75.3623%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 160.916%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 88.1911%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 199.255%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 35.4267%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 155.911%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 53.3548%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.925%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 87.8154%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 140.788%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 72.3027%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 176.89%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 80.569%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 106.177%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 43.4246%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 186.155%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 33.4407%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.424%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.7203%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 102.982%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 7.30005%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 156.55%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 42.2974%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 104.047%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.9753%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 194.462%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 81.4278%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 156.443%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 43.5319%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 105.005%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 44.2834%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 164.43%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 24.9597%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 161.874%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 22.9737%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 137.274%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 20.5582%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 142.386%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 62.8019%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 161.555%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 22.1685%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 115.548%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.7203%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 170.607%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 2.30811%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 166.347%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 30.4348%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 110.969%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 39.7746%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.956%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 99.8926%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 138.126%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 50.0268%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 188.179%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 89.4793%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 144.728%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 25.1208%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 141.214%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.1702%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 174.867%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 76.5969%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 165.708%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 70.102%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 160.916%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 59.3666%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.424%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 31.8304%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 158.04%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 34.0311%;" bis_skin_checked="1">•</div><div id="shimai-world" style="position: fixed; top: 0px; left: 0px; width: 100%; height: 100%; z-index: 2147483647; pointer-events: none; background: transparent;" bis_skin_checked="1"></div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 83.2832%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 123.633%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 37.4526%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 42.2735%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 7.0364%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 112.173%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 28.7115%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 86.7596%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 12.0974%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 34.2765%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 62.876%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 51.331%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 22.5784%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 112.489%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 39.4803%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 26.7545%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 33.5137%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 152.078%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.00966%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 85.9414%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 96.4243%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 34.0133%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 59.6016%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 124.965%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.02719%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 47.8707%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.305%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 42.0059%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 31.3461%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 73.6324%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 39.642%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 162.792%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 67.0233%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 134.936%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 42.1185%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 90.505%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 16.2303%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.37619%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 120.706%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 6.78235%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 105.538%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.02562%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 97.8762%; opacity: 0.05; padding: 0px; margin: 0px; font-size: 0.5px; line-height: 15.7px; text-align: center; vertical-align: baseline; right: 37.7088%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 130.237%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 76.8542%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 162.896%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 88.0224%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 130.317%; opacity: 0.35; padding: 0px; margin: 0px; font-size: 3.5px; line-height: 13.9px; text-align: center; vertical-align: baseline; right: 87.8274%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 177.83%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 24.527%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 76.7654%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.8089%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 8.64685%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 77.2091%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 102.912%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 92.4186%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 122.014%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.37108%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 22.1512%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 89.0497%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 126.036%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 51.9109%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.3; padding: 0px; margin: 0px; font-size: 4.8px; line-height: 14.2px; text-align: center; vertical-align: baseline; right: 79.4056%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 9.19945%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 48.5726%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 99.8917%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 27.102%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 34.7409%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 69.8734%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 107.747%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 34.3125%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 168.162%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.02182%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 182.367%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 99.9542%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.3174%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 161.962%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 14.5017%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 13.1491%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.02728%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 74.3056%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 21.0054%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 140.736%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 12.8551%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 32.5383%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 87.7528%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 18.0364%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 141.843%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.03527%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 29.4534%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 23.8395%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 173.429%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 6.55156%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 69.4265%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 39.0399%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 58.3602%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 0.75; padding: 0px; margin: 0px; font-size: 15px; line-height: 11.5px; text-align: center; vertical-align: baseline; right: 64.3999%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 149.162%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.7712%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 10.9995%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.37933%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.694%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.00371%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.11%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 40.8074%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 81.8254%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 1.86453%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.00806%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 7.32657%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 84.6707%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 67.0469%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.03293%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 121.688%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.01534%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 52.6499%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 91.0967%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 114.297%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 1.0112%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: fixed; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 0%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 64.5747%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 124.601%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 99.7853%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 191.374%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 24.3693%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.073%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 14.9758%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 142.066%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.0564%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 197.018%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 11.0038%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.317%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 75.7381%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 117.998%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 99.6779%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 172.737%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 55.1261%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 108.307%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 79.066%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 127.902%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 83.7896%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 171.885%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 13.956%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 121.832%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 90.5529%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 165.921%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 35.051%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 162.194%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 46.3768%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 199.894%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 2.89855%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 175.506%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 48.7386%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 172.204%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 93.7198%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 162.407%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 92.3779%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 174.867%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 41.4922%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 117.998%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 59.9571%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 131.523%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 91.4654%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 118.637%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 67.9012%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 141.853%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 61.3527%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 148.349%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 9.87654%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 153.461%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 73.0005%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 105.325%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 6.92432%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 102.236%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 59.5276%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.499%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 25.2281%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 126.092%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 16.3178%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 145.367%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 30.9179%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 142.705%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 29.898%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 148.136%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 57.1659%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 183.706%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 84.3264%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 177.423%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 92.2169%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 111.395%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 66.0762%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 175.932%; opacity: 1; padding: 0px; margin: 0px; font-size: 18px; line-height: 10px; text-align: center; vertical-align: baseline; right: 16.2104%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 196.486%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 61.4063%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 159.744%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 21.5781%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 122.471%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 96.7794%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 159.531%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 8.37359%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 145.58%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 80.2469%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 184.878%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 45.84%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 111.502%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 81.6962%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 175.08%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 43.1562%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 155.591%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.7005%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 199.894%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 95.2764%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 120.554%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 92.6463%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 125.559%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 57.2195%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 178.381%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 56.7364%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 125.24%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 62.6409%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 143.131%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 6.97799%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 129.925%; opacity: 1; padding: 0px; margin: 0px; font-size: 12px; line-height: 10px; text-align: center; vertical-align: baseline; right: 77.7778%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 146.752%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 65.0564%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 179.979%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 79.7101%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 132.268%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 82.1256%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 175.186%; opacity: 1; padding: 0px; margin: 0px; font-size: 16px; line-height: 10px; text-align: center; vertical-align: baseline; right: 70.1557%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 122.79%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 73.591%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 163.152%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 18.8943%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 111.182%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 78.3145%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 154.313%; opacity: 1; padding: 0px; margin: 0px; font-size: 14px; line-height: 10px; text-align: center; vertical-align: baseline; right: 28.1267%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 158.573%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 14.3854%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 180.724%; opacity: 1; padding: 0px; margin: 0px; font-size: 10px; line-height: 10px; text-align: center; vertical-align: baseline; right: 60.9769%;" bis_skin_checked="1">•</div><div style="color: rgb(255, 255, 255); position: absolute; transform: translate3d(0px, 0px, 0px); width: 8px; height: 8px; font-family: arial, verdana; cursor: default; overflow: hidden; font-weight: normal; z-index: 0; display: block; bottom: 171.672%; opacity: 1; padding: 0px; margin: 0px; font-size: 20px; line-height: 10px; text-align: center; vertical-align: baseline; right: 9.93022%;" bis_skin_checked="1">•</div></body></html>
